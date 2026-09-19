@@ -1,112 +1,107 @@
 <?php
+/**
+ * File: dashboard.php
+ * Module: Client Dashboard
+ * Author: Ben George
+ */
+
 session_start();
-// 1. Load database connection
-require_once '../db.php';
 
-// 2. Auth Guard
+// Connect to database looking up one folder
+require_once dirname(__DIR__) . '/db.php';
+
+// Protect page: require user to be logged in
 if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
+    header("Location: login.php?error=unauthorized");
+    exit();
 }
 
-// 3. Load global navigation header
-require_once '../includes/header.php';
+$user_id   = $_SESSION['user_id'];
+$user_name = $_SESSION['user_name'] ?? $_SESSION['username'] ?? 'Client';
 
-$userId   = $_SESSION['user_id'];
-$userName = $_SESSION['user_name'];
-$userRole = $_SESSION['role'];
-
-// Fetch scheduled appointments (Admins see all; Clients see only their own)
-if ($userRole === 'admin') {
-    $stmt = $pdo->prepare('SELECT a.*, u.full_name, u.email FROM appointments a JOIN users u ON a.user_id = u.id ORDER BY appointment_date ASC, appointment_time ASC');
-    $stmt->execute();
-} else {
-    $stmt = $pdo->prepare('SELECT * FROM appointments WHERE user_id = ? ORDER BY appointment_date ASC, appointment_time ASC');
-    $stmt->execute([$userId]);
-}
-
-$appointments = $stmt->fetchAll();
-
-// Mock Unit Performance Metrics
-$metrics = [
-    'total_appointments' => count($appointments),
-    'completion_rate'    => '94%',
-    'avg_wait_time'      => '12 mins'
-];
+// Fetch only appointments belonging to the logged-in user
+$stmt = $pdo->prepare("SELECT id AS appointment_id, service_type, appointment_date, status FROM appointments WHERE user_id = :user_id ORDER BY appointment_date DESC");
+$stmt->execute([':user_id' => $user_id]);
+$my_appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Dashboard - CAMS Portal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #007bff; color: #fff; padding: 15px 20px; border-radius: 6px; }
+        .card { background: #fff; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .search-container { background: #e9ecef; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        .search-form { display: flex; gap: 10px; }
+        .search-form input[type="text"] { flex-grow: 1; padding: 8px; border: 1px solid #ced4da; border-radius: 4px; }
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; text-decoration: none; }
+        .btn-primary { background: #007bff; }
+        .btn-danger { background: #dc3545; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
 
-<style>
-    .dashboard-header { display: flex; justify-content: space-between; align-items: center; background: #343a40; color: white; padding: 15px 20px; border-radius: 6px; margin-bottom: 20px; }
-    .dashboard-header h2 { margin: 0 0 5px 0; }
-    .dashboard-header p { margin: 0; color: #ccc; }
-    .metrics-grid { display: flex; gap: 20px; margin-bottom: 30px; }
-    .card { background: white; padding: 20px; border-radius: 8px; flex: 1; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .card h3 { margin-top: 0; font-size: 14px; color: #6c757d; text-transform: uppercase; }
-    .card .metric { font-size: 28px; font-weight: bold; color: #333; }
-    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; }
-    th { background: #e9ecef; }
-    .btn-booking { background: #007bff; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; font-weight: bold; }
-</style>
-
-<div class="dashboard-header">
-    <div>
-        <h2>Portal Dashboard</h2>
-        <p>Welcome, <?= htmlspecialchars($userName) ?> (<?= ucfirst(htmlspecialchars($userRole)) ?>)</p>
+    <!-- Header bar with username and logout link -->
+    <div class="header">
+        <h2>Client Portal</h2>
+        <div>
+            Welcome, <strong><?php echo htmlspecialchars($user_name, ENT_QUOTES, 'UTF-8'); ?></strong> |
+            <a href="logout.php" style="color: #ffc107; text-decoration: none; font-weight: bold;">Logout</a>
+        </div>
     </div>
-    <div>
-        <a href="booking.php" class="btn-booking">+ New Booking</a>
-    </div>
-</div>
 
-<!-- Unit Performance Metrics Placeholders -->
-<div class="metrics-grid">
     <div class="card">
-        <h3>Total Bookings</h3>
-        <div class="metric"><?= $metrics['total_appointments'] ?></div>
-    </div>
-    <div class="card">
-        <h3>Unit Completion Rate</h3>
-        <div class="metric"><?= $metrics['completion_rate'] ?></div>
-    </div>
-    <div class="card">
-        <h3>Avg Processing Time</h3>
-        <div class="metric"><?= $metrics['avg_wait_time'] ?></div>
-    </div>
-</div>
+        <!-- Integrated Search redirecting to week2 search engine -->
+        <div class="search-container">
+            <strong>Quick Search Appointments:</strong>
+            <form action="../week2/search.php" method="GET" class="search-form" style="margin-top: 10px;">
+                <input type="text" name="query" placeholder="Search by service or status..." required>
+                <button type="submit" class="btn btn-primary">Search</button>
+            </form>
+        </div>
 
-<!-- Scheduled Appointments Table -->
-<h3>Scheduled Appointments</h3>
-<?php if (empty($appointments)): ?>
-    <p>No appointments scheduled yet.</p>
-<?php else: ?>
-    <table>
-        <thead>
-            <tr>
-                <?php if ($userRole === 'admin'): ?><th>Client Name</th><?php endif; ?>
-                <th>Service Type</th>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Notes</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($appointments as $app): ?>
+        <h3>My Scheduled Appointments</h3>
+        <table>
+            <thead>
                 <tr>
-                    <?php if ($userRole === 'admin'): ?>
-                        <td><?= htmlspecialchars($app['full_name']) ?> (<?= htmlspecialchars($app['email']) ?>)</td>
-                    <?php endif; ?>
-                    <td><?= htmlspecialchars($app['service_type']) ?></td>
-                    <td><?= htmlspecialchars($app['appointment_date']) ?></td>
-                    <td><?= htmlspecialchars($app['appointment_time']) ?></td>
-                    <td><?= htmlspecialchars($app['notes'] ?: 'N/A') ?></td>
+                    <th>ID</th>
+                    <th>Service Requested</th>
+                    <th>Date & Time</th>
+                    <th>Status</th>
+                    <th>Action</th>
                 </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-<?php endif; ?>
+            </thead>
+            <tbody>
+                <?php if (!empty($my_appointments)): ?>
+                    <?php foreach ($my_appointments as $app): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars((string)$app['appointment_id'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars((string)$app['service_type'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars((string)$app['appointment_date'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><strong><?php echo htmlspecialchars((string)$app['status'], ENT_QUOTES, 'UTF-8'); ?></strong></td>
+                        <td>
+                            <!-- Cancel action posting to schedule.php engine -->
+                            <form action="../week2/schedule.php" method="POST" style="display:inline;">
+                                <input type="hidden" name="action" value="cancel">
+                                <input type="hidden" name="appointment_id" value="<?php echo htmlspecialchars((string)$app['appointment_id'], ENT_QUOTES, 'UTF-8'); ?>">
+                                <button type="submit" class="btn btn-danger" onclick="return confirm('Cancel this appointment?');">Cancel</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #6c757d;">No appointments found.</td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
 
-<?php
-// 4. Load global footer
-require_once '../includes/footer.php';
-?>
+</body>
+</html>
