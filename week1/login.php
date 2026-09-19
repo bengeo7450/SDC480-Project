@@ -84,16 +84,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <button type="submit" class="btn-submit">Sign In</button>
-    </form>
-    <form action="login.php" method="POST">
-        <!-- Existing username/password fields -->
-        
-        <button type="submit">Login</button>
-        
+
         <div style="margin-top: 15px; text-align: center;">
-            <a href="forgot_password.php" style="color: #007bff; text-decoration: none;">Forgot Password?</a>
+            <a href="../week2/forgot_password.php" style="color: #007bff; text-decoration: none;">Forgot Password?</a>
         </div>
     </form>
+
     <div class="form-footer">
         <p>Don't have an account? <a href="register.php">Register here</a></p>
     </div>

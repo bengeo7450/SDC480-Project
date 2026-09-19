@@ -1,32 +1,39 @@
 <?php
 /**
  * File: forgot_password.php
- * Module: Password Recovery Initiation
+ * Module: Password Reset Request Engine
  * Author: Ben George
  */
+
 session_start();
+
+// Connect to database using root directory path
 require_once dirname(__DIR__) . '/db.php';
 
+$message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
+    $email = trim($_POST['email'] ?? '');
 
-    if (empty($username)) {
-        $error = "Please enter your username.";
-    } else {
-        // Check if user exists
-        $stmt = $pdo->prepare("SELECT id FROM users WHERE username = :username");
-        $stmt->execute([':username' => $username]);
+    if (!empty($email)) {
+        // Updated query: look up user by 'email' instead of 'username'
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = :email");
+        $stmt->execute([':email' => $email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user) {
-            // Redirect to reset page passing the account ID
-            header("Location: reset_password.php?user_id=" . $user['id']);
+            // Generates a secure reset token
+            $token = bin2hex(random_bytes(32));
+            
+            // Redirect to reset_password.php passing the token and email
+            header("Location: reset_password.php?token=" . urlencode($token) . "&email=" . urlencode($email));
             exit();
         } else {
-            $error = "No account found with that username.";
+            $error = "No account found with that email address.";
         }
+    } else {
+        $error = "Please enter your email address.";
     }
 }
 ?>
@@ -36,33 +43,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <title>Forgot Password - CAMS Portal</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 40px; }
-        .card { max-width: 400px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        body { font-family: Arial, sans-serif; background: #f4f6f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 380px; }
+        .card h2 { margin-top: 0; color: #333; text-align: center; }
         .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="text"] { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        .alert-error { color: #dc3545; background: #f8d7da; padding: 10px; border-radius: 4px; margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: #555; font-weight: bold; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn-submit { width: 100%; padding: 10px; background: #007bff; border: none; color: white; font-weight: bold; border-radius: 4px; cursor: pointer; }
+        .btn-submit:hover { background: #0056b3; }
+        .alert-error { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px; margin-bottom: 15px; text-align: center; font-size: 0.9rem; }
+        .form-footer { margin-top: 15px; text-align: center; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>Account Recovery</h2>
-    <p style="color: #6c757d; font-size: 0.9em;">Enter your username to reset your password.</p>
+    <h2>Reset Password</h2>
 
-    <?php if ($error): ?>
-        <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
+    <?php if (!empty($error)): ?>
+        <div class="alert-error"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
     <?php endif; ?>
 
     <form action="forgot_password.php" method="POST">
         <div class="form-group">
-            <label>Username</label>
-            <input type="text" name="username" required>
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" placeholder="name@example.com" required autocomplete="email">
         </div>
-        <button type="submit">Continue</button>
+
+        <button type="submit" class="btn-submit">Request Reset Link</button>
     </form>
-    <p style="margin-top: 15px; text-align: center;"><a href="login.php">Back to Login</a></p>
+
+    <div class="form-footer">
+        <p>Remembered your password? <a href="../week1/login.php" style="color: #007bff; text-decoration: none;">Sign in here</a></p>
+    </div>
 </div>
 
 </body>
